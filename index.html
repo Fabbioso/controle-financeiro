@@ -63,6 +63,12 @@
                     <span class="hidden sm:inline">Anexar</span> Imagem
                 </button>
 
+                <!-- Configurar Chave Gemini AI -->
+                <button id="btnApiKeyConfig" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border border-slate-700" title="Configurar Chave da IA (Gemini)">
+                    <i class="fa-solid fa-key text-xs text-amber-400"></i>
+                    <span class="hidden md:inline">Chave IA</span>
+                </button>
+
                 <input type="file" id="csvFileInput" accept=".csv, .txt, text/csv, text/plain, application/vnd.ms-excel" class="hidden">
                 <button id="btnImportCSV" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-file-import text-xs"></i>
@@ -296,6 +302,30 @@
         </div>
     </div>
 
+    <!-- Gemini API Key Modal -->
+    <div id="apiKeyModalOverlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl border border-slate-100">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Chave da IA (Google Gemini)</h3>
+                    <p class="text-xs text-slate-500">Para leitura de recibos no GitHub Pages</p>
+                </div>
+            </div>
+            <p class="text-xs text-slate-600 mb-4 leading-relaxed">
+                Para usar a leitura automática por foto no seu link publicado, insira sua chave gratuita do Google Gemini.
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="text-purple-600 underline font-semibold hover:text-purple-700">Obter chave grátis aqui</a>.
+            </p>
+            <input type="password" id="geminiApiKeyInput" placeholder="Cole sua chave (AIzaSy...)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <div class="flex justify-end gap-2">
+                <button id="btnApiKeyCancel" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Cancelar</button>
+                <button id="btnApiKeySave" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-xl transition">Salvar Chave</button>
+            </div>
+        </div>
+    </div>
+
     <div id="aiLoadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
         <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-100 text-center flex flex-col items-center">
             <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl mb-4 animate-bounce">
@@ -352,6 +382,32 @@
             const btnScanGallery = document.getElementById('btnScanGallery');
             const receiptGalleryInput = document.getElementById('receiptGalleryInput');
             const aiLoadingOverlay = document.getElementById('aiLoadingOverlay');
+
+            // API Key Modal Elements
+            const btnApiKeyConfig = document.getElementById('btnApiKeyConfig');
+            const apiKeyModalOverlay = document.getElementById('apiKeyModalOverlay');
+            const geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
+            const btnApiKeyCancel = document.getElementById('btnApiKeyCancel');
+            const btnApiKeySave = document.getElementById('btnApiKeySave');
+
+            btnApiKeyConfig.addEventListener('click', () => {
+                geminiApiKeyInput.value = localStorage.getItem('cf_gemini_key') || '';
+                apiKeyModalOverlay.classList.remove('hidden');
+                setTimeout(() => apiKeyModalOverlay.classList.remove('opacity-0'), 10);
+            });
+
+            btnApiKeyCancel.addEventListener('click', () => {
+                apiKeyModalOverlay.classList.add('opacity-0');
+                setTimeout(() => apiKeyModalOverlay.classList.add('hidden'), 200);
+            });
+
+            btnApiKeySave.addEventListener('click', () => {
+                const key = geminiApiKeyInput.value.trim();
+                localStorage.setItem('cf_gemini_key', key);
+                apiKeyModalOverlay.classList.add('opacity-0');
+                setTimeout(() => apiKeyModalOverlay.classList.add('hidden'), 200);
+                showToast('Chave da IA salva com sucesso!');
+            });
 
             // Modal Elements
             const modalOverlay = document.getElementById('modalOverlay');
@@ -795,24 +851,46 @@
                 showAILoading(true);
 
                 try {
-                    const base64Data = await fileToBase64(file);
-                    const mimeType = file.type || 'image/jpeg';
-                    const extractedData = await processReceiptWithGemini(base64Data, mimeType);
+                    // Compress image for mobile browsers (reduces 12MB photos to ~150KB JPEG)
+                    const base64Data = await compressImage(file);
+                    const extractedData = await processReceiptWithGemini(base64Data, 'image/jpeg');
 
                     if (extractedData) {
-                        tipoInput.value = 'Saída';
-                        if (extractedData.data) dataInput.value = extractedData.data;
-                        if (extractedData.descricao) descricaoInput.value = extractedData.descricao;
-                        if (extractedData.valor) valorInput.value = extractedData.valor;
-                        if (extractedData.categoria) categoriaInput.value = extractedData.categoria;
-                        if (extractedData.formaPagamento) formaPagamentoInput.value = extractedData.formaPagamento;
+                        const newTransaction = {
+                            id: Date.now().toString(),
+                            data: extractedData.data || new Date().toISOString().split('T')[0],
+                            tipo: 'Saída',
+                            descricao: extractedData.descricao || 'Despesa por Recibo',
+                            valor: parseFloat(extractedData.valor) || 0,
+                            categoria: extractedData.categoria || 'Outros',
+                            formaPagamento: extractedData.formaPagamento || 'Pix'
+                        };
 
-                        form.scrollIntoView({ behavior: 'smooth' });
-                        showToast('Recibo lido com sucesso! Confira e confirme os dados.');
+                        if (newTransaction.valor > 0) {
+                            // Adiciona automaticamente no histórico e atualiza o Dashboard
+                            transactions.unshift(newTransaction);
+                            saveTransactions();
+                            showToast(`Recibo lido! Despesa de ${formatCurrency(newTransaction.valor)} lançada automaticamente.`, 'fa-circle-check text-emerald-400');
+                        } else {
+                            // Preenche o formulário para revisão manual se o valor não for detectado
+                            tipoInput.value = 'Saída';
+                            if (extractedData.data) dataInput.value = extractedData.data;
+                            if (extractedData.descricao) descricaoInput.value = extractedData.descricao;
+                            if (extractedData.categoria) categoriaInput.value = extractedData.categoria;
+                            if (extractedData.formaPagamento) formaPagamentoInput.value = extractedData.formaPagamento;
+                            form.scrollIntoView({ behavior: 'smooth' });
+                            showToast('Recibo lido! Por favor, insira o valor e confirme.', 'fa-circle-exclamation text-amber-400');
+                        }
                     }
                 } catch (err) {
                     console.error('Erro na leitura do recibo:', err);
-                    showToast('Não foi possível ler o recibo. Tente novamente ou insira manualmente.', 'fa-circle-xmark text-rose-400');
+                    if (err.message && err.message.includes('API Key')) {
+                        apiKeyModalOverlay.classList.remove('hidden');
+                        setTimeout(() => apiKeyModalOverlay.classList.remove('opacity-0'), 10);
+                        showToast('Configure sua chave gratuita do Gemini para usar a IA.', 'fa-circle-exclamation text-amber-400');
+                    } else {
+                        showToast('Não foi possível ler o recibo. Verifique a imagem ou configure a chave da IA.', 'fa-circle-xmark text-rose-400');
+                    }
                 } finally {
                     showAILoading(false);
                     receiptCameraInput.value = '';
@@ -826,15 +904,43 @@
             receiptCameraInput.addEventListener('change', (e) => processReceiptFile(e.target.files[0]));
             receiptGalleryInput.addEventListener('change', (e) => processReceiptFile(e.target.files[0]));
 
-            // Convert File object to Base64 String
-            const fileToBase64 = (file) => {
+            // Compress & Resize Image for Mobile Browsers
+            const compressImage = (file) => {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onload = () => {
-                        const base64Str = reader.result.split(',')[1];
-                        resolve(base64Str);
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            const MAX_SIZE = 1024;
+
+                            if (width > height) {
+                                if (width > MAX_SIZE) {
+                                    height = Math.round(height * (MAX_SIZE / width));
+                                    width = MAX_SIZE;
+                                }
+                            } else {
+                                if (height > MAX_SIZE) {
+                                    width = Math.round(width * (MAX_SIZE / height));
+                                    height = MAX_SIZE;
+                                }
+                            }
+
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                            const base64Str = dataUrl.split(',')[1];
+                            resolve(base64Str);
+                        };
+                        img.onerror = reject;
+                        img.src = e.target.result;
                     };
-                    reader.onerror = error => reject(error);
+                    reader.onerror = reject;
                     reader.readAsDataURL(file);
                 });
             };
@@ -852,7 +958,8 @@
 
             // Call Gemini API with Exponential Backoff retry
             const processReceiptWithGemini = async (base64ImageData, mimeType) => {
-                const apiKey = ""; // Runtime automatically inserts API key in Canvas environment
+                // Priority: user saved key in LocalStorage -> fallback to default empty string
+                const apiKey = localStorage.getItem('cf_gemini_key') || "";
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
                 const promptText = `Analise a imagem deste recibo, nota fiscal ou comprovante de pagamento e extraia os dados para inclusão em controle financeiro.`;
@@ -896,7 +1003,6 @@
                     }
                 };
 
-                // Exponential backoff logic
                 let attempts = 0;
                 const maxAttempts = 3;
                 let delay = 1000;
@@ -908,6 +1014,10 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
                         });
+
+                        if (response.status === 400 || response.status === 403) {
+                            throw new Error('API Key inválida ou ausente');
+                        }
 
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
@@ -923,6 +1033,9 @@
                         }
                     } catch (err) {
                         attempts++;
+                        if (err.message && err.message.includes('API Key')) {
+                            throw err; // Don't retry if API key is invalid
+                        }
                         if (attempts >= maxAttempts) throw err;
                         await new Promise(res => setTimeout(res, delay));
                         delay *= 2;
