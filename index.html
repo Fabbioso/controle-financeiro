@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Financeiro Pessoal e Empresarial</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-emerald-500 text-white p-2 rounded-xl shadow-md">
+                    <i class="fa-solid fa-wallet text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">Controle Financeiro</h1>
+                    <p class="text-xs text-slate-400">Gestão Pessoal & Empresarial</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <input type="file" id="receiptFileInput" accept="image/*" capture="environment" class="hidden">
+                <button id="btnScanReceipt" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-camera text-xs"></i>
+                    <span class="hidden sm:inline">Escanear</span> Recibo
+                </button>
+
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                <button id="btnImportCSV" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-file-import text-xs"></i>
+                    <span class="hidden sm:inline">Importar</span> CSV
+                </button>
+                <button id="btnExportMarkdown" class="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-code text-xs"></i>
+                    <span class="hidden sm:inline">Copiar Tabela</span> Markdown
+                </button>
+                <button id="btnExportCSV" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-file-excel text-xs"></i>
+                    <span class="hidden sm:inline">Exportar</span> CSV
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Top Summary KPIs -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Entradas -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Entradas</p>
+                    <h3 id="kpiEntradas" class="text-2xl font-bold text-emerald-600 mt-1">R$ 0,00</h3>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-arrow-down-left"></i>
+                </div>
+            </div>
+
+            <!-- Saídas -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Total Saídas</p>
+                    <h3 id="kpiSaidas" class="text-2xl font-bold text-rose-600 mt-1">R$ 0,00</h3>
+                </div>
+                <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-arrow-up-right"></i>
+                </div>
+            </div>
+
+            <!-- Saldo Líquido -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Saldo Líquido</p>
+                    <h3 id="kpiSaldo" class="text-2xl font-bold text-slate-800 mt-1">R$ 0,00</h3>
+                </div>
+                <div id="kpiSaldoIcon" class="w-12 h-12 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-xl font-bold">
+                    <i class="fa-solid fa-scale-balanced"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Form and Category Summary Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Transaction Form Card -->
+            <section class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-plus text-emerald-500"></i>
+                        Novo Lançamento
+                    </h2>
+                    <span class="text-xs text-slate-400">Preencha os dados abaixo</span>
+                </div>
+
+                <form id="transactionForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Tipo -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Tipo de Operação</label>
+                        <select id="tipo" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition" required>
+                            <option value="Saída">🔴 Saída (Despesa)</option>
+                            <option value="Entrada">🟢 Entrada (Receita)</option>
+                        </select>
+                    </div>
+
+                    <!-- Data -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Data</label>
+                        <input type="date" id="data" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition" required>
+                    </div>
+
+                    <!-- Descrição -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Descrição</label>
+                        <input type="text" id="descricao" placeholder="Ex: Supermercado, Pagamento de Cliente, Conta de Luz" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition" required>
+                    </div>
+
+                    <!-- Valor -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Valor (R$)</label>
+                        <input type="number" step="0.01" min="0.01" id="valor" placeholder="0,00" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition" required>
+                    </div>
+
+                    <!-- Categoria -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Categoria</label>
+                        <select id="categoria" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition" required>
+                            <option value="Alimentação">Alimentação</option>
+                            <option value="Transporte">Transporte</option>
+                            <option value="Moradia">Moradia</option>
+                            <option value="Lazer">Lazer</option>
+                            <option value="Saúde">Saúde</option>
+                            <option value="Educação">Educação</option>
+                            <option value="Receita Serviços">Receita Serviços</option>
+                            <option value="Vendas">Vendas</option>
+                            <option value="Investimentos">Investimentos</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+
+                    <!-- Forma de Pagamento -->
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Forma de Pagamento</label>
+                        <select id="formaPagamento" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition" required>
+                            <option value="Pix">Pix</option>
+                            <option value="Débito">Cartão de Débito</option>
+                            <option value="Crédito">Cartão de Crédito</option>
+                            <option value="Dinheiro">Dinheiro</option>
+                            <option value="Boleto">Boleto Bancário</option>
+                            <option value="Transferência">Transferência / TED</option>
+                        </select>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="sm:col-span-2 pt-2">
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md transition duration-200 flex items-center justify-center gap-2 active:scale-[0.99]">
+                            <i class="fa-solid fa-plus text-sm"></i>
+                            Adicionar Lançamento
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Category Spending Distribution -->
+            <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                <h2 class="text-base font-bold text-slate-800 mb-1 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-indigo-500"></i>
+                    Gastos por Categoria
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">Proporção das despesas realizadas</p>
+
+                <div id="categoryContainer" class="flex-grow space-y-3 overflow-y-auto max-h-[300px] pr-1">
+                    <!-- Populated dynamically via JS -->
+                    <div class="text-center text-slate-400 text-xs py-8">
+                        Nenhum gasto registrado até o momento.
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Transactions Table Section -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-slate-600"></i>
+                        Histórico de Lançamentos
+                    </h2>
+                    <p class="text-xs text-slate-400">Todos os registros salvos neste dispositivo</p>
+                </div>
+
+                <!-- Filters & Clear -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="relative min-w-[140px]">
+                        <input type="text" id="searchInput" placeholder="Buscar..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                        <i class="fa-solid fa-magnifying-glass text-slate-400 absolute left-2.5 top-2 text-xs"></i>
+                    </div>
+
+                    <select id="filterTipo" class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none">
+                        <option value="TODOS">Todos os tipos</option>
+                        <option value="Entrada">Entradas</option>
+                        <option value="Saída">Saídas</option>
+                    </select>
+
+                    <button id="btnClearAll" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                        Limpar Tudo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                            <th class="p-3 pl-6">Data</th>
+                            <th class="p-3">Tipo</th>
+                            <th class="p-3">Descrição</th>
+                            <th class="p-3">Categoria</th>
+                            <th class="p-3">Valor</th>
+                            <th class="p-3">Forma de Pagamento</th>
+                            <th class="p-3 pr-6 text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody" class="divide-y divide-slate-100 text-slate-700">
+                        <!-- Populated dynamically via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="p-12 text-center text-slate-400">
+                <i class="fa-solid fa-receipt text-4xl mb-3 text-slate-300"></i>
+                <p class="text-sm font-medium">Nenhum lançamento registrado</p>
+                <p class="text-xs text-slate-400 mt-1">Preencha o formulário acima para adicionar sua primeira movimentação.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-100 py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+            Controle Financeiro Pessoal & Empresarial &bull; Seus dados ficam salvos de forma segura no seu navegador.
+        </div>
+    </footer>
+
+    <!-- Custom Modal / Toast System -->
+    <div id="modalOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl border border-slate-100 transform scale-95 transition-transform duration-200" id="modalBox">
+            <h3 id="modalTitle" class="text-base font-bold text-slate-800 mb-2">Confirmação</h3>
+            <p id="modalMessage" class="text-xs text-slate-600 mb-6">Tem certeza que deseja prosseguir?</p>
+            <div class="flex justify-end gap-2" id="modalActions">
+                <button id="btnModalCancel" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">Cancelar</button>
+                <button id="btnModalConfirm" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="aiLoadingOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-200">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-slate-100 text-center flex flex-col items-center">
+            <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl mb-4 animate-bounce">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <h3 class="text-base font-bold text-slate-800 mb-1">Lendo Recibo com IA...</h3>
+            <p class="text-xs text-slate-500 mb-4">Estamos analisando os dados do seu comprovante. Aguarde um instante.</p>
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                <div class="bg-purple-600 h-full w-1/2 rounded-full animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+        <span id="toastMessage">Operação realizada com sucesso!</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // State
+            let transactions = JSON.parse(localStorage.getItem('cf_transactions')) || [];
+
+            // DOM Elements
+            const form = document.getElementById('transactionForm');
+            const dataInput = document.getElementById('data');
+            const tipoInput = document.getElementById('tipo');
+            const descricaoInput = document.getElementById('descricao');
+            const valorInput = document.getElementById('valor');
+            const categoriaInput = document.getElementById('categoria');
+            const formaPagamentoInput = document.getElementById('formaPagamento');
+
+            const kpiEntradas = document.getElementById('kpiEntradas');
+            const kpiSaidas = document.getElementById('kpiSaidas');
+            const kpiSaldo = document.getElementById('kpiSaldo');
+            const kpiSaldoIcon = document.getElementById('kpiSaldoIcon');
+
+            const transactionsBody = document.getElementById('transactionsBody');
+            const emptyState = document.getElementById('emptyState');
+            const categoryContainer = document.getElementById('categoryContainer');
+
+            const searchInput = document.getElementById('searchInput');
+            const filterTipo = document.getElementById('filterTipo');
+
+            const btnExportMarkdown = document.getElementById('btnExportMarkdown');
+            const btnExportCSV = document.getElementById('btnExportCSV');
+            const btnImportCSV = document.getElementById('btnImportCSV');
+            const csvFileInput = document.getElementById('csvFileInput');
+            const btnClearAll = document.getElementById('btnClearAll');
+
+            const btnScanReceipt = document.getElementById('btnScanReceipt');
+            const receiptFileInput = document.getElementById('receiptFileInput');
+            const aiLoadingOverlay = document.getElementById('aiLoadingOverlay');
+
+            // Modal Elements
+            const modalOverlay = document.getElementById('modalOverlay');
+            const modalBox = document.getElementById('modalBox');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const btnModalCancel = document.getElementById('btnModalCancel');
+            const btnModalConfirm = document.getElementById('btnModalConfirm');
+
+            // Toast Elements
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            // Set default date to today
+            const today = new Date().toISOString().split('T')[0];
+            dataInput.value = today;
+
+            // Formatter Helper
+            const formatCurrency = (amount) => {
+                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
+            };
+
+            const formatDateBR = (isoDate) => {
+                if (!isoDate) return '';
+                const [year, month, day] = isoDate.split('-');
+                return `${day}/${month}/${year}`;
+            };
+
+            // Save state
+            const saveTransactions = () => {
+                localStorage.setItem('cf_transactions', JSON.stringify(transactions));
+                updateUI();
+            };
+
+            // Toast Alert
+            const showToast = (message, iconClass = 'fa-circle-check text-emerald-400') => {
+                toastMessage.textContent = message;
+                toastIcon.className = `fa-solid ${iconClass} text-sm`;
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            };
+
+            // Custom Confirm Modal
+            const openModal = ({ title, message, onConfirm }) => {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalOverlay.classList.remove('hidden');
+                setTimeout(() => {
+                    modalOverlay.classList.remove('opacity-0');
+                    modalBox.classList.remove('scale-95');
+                }, 10);
+
+                const handleConfirm = () => {
+                    onConfirm();
+                    closeModal();
+                    btnModalConfirm.removeEventListener('click', handleConfirm);
+                };
+
+                btnModalConfirm.onclick = handleConfirm;
+            };
+
+            const closeModal = () => {
+                modalOverlay.classList.add('opacity-0');
+                modalBox.classList.add('scale-95');
+                setTimeout(() => {
+                    modalOverlay.classList.add('hidden');
+                }, 200);
+            };
+
+            btnModalCancel.addEventListener('click', closeModal);
+
+            // Add Transaction
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const newTransaction = {
+                    id: Date.now().toString(),
+                    data: dataInput.value,
+                    tipo: tipoInput.value,
+                    descricao: descricaoInput.value.trim(),
+                    valor: parseFloat(valorInput.value),
+                    categoria: categoriaInput.value,
+                    formaPagamento: formaPagamentoInput.value
+                };
+
+                transactions.unshift(newTransaction);
+                saveTransactions();
+
+                // Reset inputs
+                descricaoInput.value = '';
+                valorInput.value = '';
+                descricaoInput.focus();
+
+                showToast('Lançamento adicionado com sucesso!');
+            });
+
+            // Delete Transaction
+            window.deleteTransaction = (id) => {
+                openModal({
+                    title: 'Excluir Lançamento',
+                    message: 'Deseja realmente excluir este item?',
+                    onConfirm: () => {
+                        transactions = transactions.filter(t => t.id !== id);
+                        saveTransactions();
+                        showToast('Lançamento removido.', 'fa-circle-info text-rose-400');
+                    }
+                });
+            };
+
+            // Clear All
+            btnClearAll.addEventListener('click', () => {
+                if (transactions.length === 0) return;
+                openModal({
+                    title: 'Limpar Todos os Lançamentos',
+                    message: 'Atenção! Esta ação apagará permanentemente todo o seu histórico financeiro.',
+                    onConfirm: () => {
+                        transactions = [];
+                        saveTransactions();
+                        showToast('Todos os registros foram apagados.', 'fa-circle-info text-amber-400');
+                    }
+                });
+            });
+
+            // Update UI & Dashboard
+            const updateUI = () => {
+                const search = searchInput.value.toLowerCase();
+                const tipoFilter = filterTipo.value;
+
+                // Filtered Transactions
+                const filtered = transactions.filter(t => {
+                    const matchesSearch = t.descricao.toLowerCase().includes(search) || 
+                                          t.categoria.toLowerCase().includes(search) ||
+                                          t.formaPagamento.toLowerCase().includes(search);
+                    const matchesTipo = tipoFilter === 'TODOS' || t.tipo === tipoFilter;
+                    return matchesSearch && matchesTipo;
+                });
+
+                // Calculate Totals (Always calculated over ALL transactions)
+                const totalEntradas = transactions
+                    .filter(t => t.tipo === 'Entrada')
+                    .reduce((sum, t) => sum + t.valor, 0);
+
+                const totalSaidas = transactions
+                    .filter(t => t.tipo === 'Saída')
+                    .reduce((sum, t) => sum + t.valor, 0);
+
+                const saldo = totalEntradas - totalSaidas;
+
+                // Update KPIs
+                kpiEntradas.textContent = formatCurrency(totalEntradas);
+                kpiSaidas.textContent = formatCurrency(totalSaidas);
+                kpiSaldo.textContent = formatCurrency(saldo);
+
+                if (saldo >= 0) {
+                    kpiSaldo.className = 'text-2xl font-bold text-emerald-600 mt-1';
+                    kpiSaldoIcon.className = 'w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl font-bold';
+                } else {
+                    kpiSaldo.className = 'text-2xl font-bold text-rose-600 mt-1';
+                    kpiSaldoIcon.className = 'w-12 h-12 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center text-xl font-bold';
+                }
+
+                // Render Table
+                transactionsBody.innerHTML = '';
+                if (filtered.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    filtered.forEach(t => {
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+                        const isEntrada = t.tipo === 'Entrada';
+                        const badgeColor = isEntrada 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                            : 'bg-rose-50 text-rose-700 border-rose-200';
+
+                        tr.innerHTML = `
+                            <td class="p-3 pl-6 font-medium text-slate-600 whitespace-nowrap">${formatDateBR(t.data)}</td>
+                            <td class="p-3 whitespace-nowrap">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badgeColor}">
+                                    ${t.tipo}
+                                </span>
+                            </td>
+                            <td class="p-3 font-semibold text-slate-800">${t.descricao}</td>
+                            <td class="p-3 text-slate-500">${t.categoria}</td>
+                            <td class="p-3 font-bold ${isEntrada ? 'text-emerald-600' : 'text-slate-800'} whitespace-nowrap">
+                                ${isEntrada ? '+' : '-'} ${formatCurrency(t.valor)}
+                            </td>
+                            <td class="p-3 text-slate-500 whitespace-nowrap">${t.formaPagamento}</td>
+                            <td class="p-3 pr-6 text-right whitespace-nowrap">
+                                <button onclick="deleteTransaction('${t.id}')" class="text-slate-400 hover:text-rose-600 p-1 rounded transition" title="Excluir">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </td>
+                        `;
+                        transactionsBody.appendChild(tr);
+                    });
+                }
+
+                // Render Category Breakdown (for Saídas)
+                renderCategoryBreakdown(totalSaidas);
+            };
+
+            // Category Breakdown Chart simulation
+            const renderCategoryBreakdown = (totalSaidas) => {
+                categoryContainer.innerHTML = '';
+
+                const despesas = transactions.filter(t => t.tipo === 'Saída');
+                if (despesas.length === 0 || totalSaidas === 0) {
+                    categoryContainer.innerHTML = `
+                        <div class="text-center text-slate-400 text-xs py-8">
+                            Nenhum gasto registrado até o momento.
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Group by category
+                const catTotals = {};
+                despesas.forEach(t => {
+                    catTotals[t.categoria] = (catTotals[t.categoria] || 0) + t.valor;
+                });
+
+                // Sort by amount descending
+                const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+
+                sortedCats.forEach(([cat, val]) => {
+                    const percentage = Math.round((val / totalSaidas) * 100);
+                    const item = document.createElement('div');
+                    item.className = 'space-y-1';
+                    item.innerHTML = `
+                        <div class="flex justify-between text-xs font-medium">
+                            <span class="text-slate-700">${cat}</span>
+                            <span class="text-slate-500">${formatCurrency(val)} (${percentage}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div class="bg-indigo-500 h-2 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                        </div>
+                    `;
+                    categoryContainer.appendChild(item);
+                });
+            };
+
+            // Export to Markdown Table
+            btnExportMarkdown.addEventListener('click', () => {
+                if (transactions.length === 0) {
+                    showToast('Não há dados para exportar.', 'fa-circle-exclamation text-amber-400');
+                    return;
+                }
+
+                let md = '| Data | Tipo | Descrição | Categoria | Valor | Forma de Pagamento |\n';
+                md += '| --- | --- | --- | --- | --- | --- |\n';
+
+                // Sort by date ascending for clean export
+                const sorted = [...transactions].sort((a, b) => new Date(a.data) - new Date(b.data));
+
+                sorted.forEach(t => {
+                    const formattedValor = `R$ ${t.valor.toFixed(2).replace('.', ',')}`;
+                    md += `| ${formatDateBR(t.data)} | ${t.tipo} | ${t.descricao} | ${t.categoria} | ${formattedValor} | ${t.formaPagamento} |\n`;
+                });
+
+                // Copy to clipboard fallback mechanism
+                const textarea = document.createElement('textarea');
+                textarea.value = md;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Tabela Markdown copiada para a área de transferência!');
+                } catch (err) {
+                    showToast('Erro ao copiar tabela.', 'fa-circle-xmark text-rose-400');
+                }
+                document.body.removeChild(textarea);
+            });
+
+            // Export to CSV
+            btnExportCSV.addEventListener('click', () => {
+                if (transactions.length === 0) {
+                    showToast('Não há dados para exportar.', 'fa-circle-exclamation text-amber-400');
+                    return;
+                }
+
+                let csvContent = 'data:text/csv;charset=utf-8,';
+                csvContent += 'Data;Tipo;Descrição;Categoria;Valor;Forma de Pagamento\n';
+
+                const sorted = [...transactions].sort((a, b) => new Date(a.data) - new Date(b.data));
+
+                sorted.forEach(t => {
+                    const valorStr = t.valor.toFixed(2).replace('.', ',');
+                    csvContent += `${formatDateBR(t.data)};${t.tipo};"${t.descricao}";${t.categoria};${valorStr};${t.formaPagamento}\n`;
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement('a');
+                link.setAttribute('href', encodedUri);
+                link.setAttribute('download', `Controle_Financeiro_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                showToast('Arquivo CSV baixado com sucesso!');
+            });
+
+            // Import from CSV
+            btnImportCSV.addEventListener('click', () => {
+                csvFileInput.click();
+            });
+
+            csvFileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const content = evt.target.result;
+                        const lines = content.split(/\r\n|\n/);
+                        if (lines.length < 2) {
+                            showToast('O arquivo CSV parece estar vazio.', 'fa-circle-exclamation text-amber-400');
+                            return;
+                        }
+
+                        // Auto detect delimiter
+                        const firstLine = lines[0];
+                        const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
+
+                        // Parse headers
+                        const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+
+                        let importedCount = 0;
+                        const newTransactions = [];
+
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+
+                            const columns = line.split(delimiter).map(col => col.trim().replace(/^"|"$/g, ''));
+                            if (columns.length < 2) continue;
+
+                            let dataVal = '', tipoVal = '', descVal = '', catVal = 'Outros', valorVal = 0, formaVal = 'Pix';
+
+                            headers.forEach((h, index) => {
+                                const val = columns[index] || '';
+                                if (h.includes('data') || h.includes('date')) dataVal = val;
+                                else if (h.includes('tipo') || h.includes('type')) tipoVal = val;
+                                else if (h.includes('desc') || h.includes('titulo')) descVal = val;
+                                else if (h.includes('cat')) catVal = val;
+                                else if (h.includes('valor') || h.includes('amount') || h.includes('price')) {
+                                    let cleanVal = val.replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
+                                    valorVal = parseFloat(cleanVal) || 0;
+                                }
+                                else if (h.includes('forma') || h.includes('pagamento') || h.includes('method')) formaVal = val;
+                            });
+
+                            // Fallbacks
+                            if (!descVal && columns[2]) descVal = columns[2];
+                            if (!descVal && columns[0]) descVal = `Item ${i}`;
+
+                            // Date parsing (DD/MM/YYYY to YYYY-MM-DD)
+                            if (dataVal.includes('/')) {
+                                const parts = dataVal.split('/');
+                                if (parts.length === 3) {
+                                    dataVal = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                }
+                            }
+                            if (!dataVal || isNaN(new Date(dataVal).getTime())) {
+                                dataVal = new Date().toISOString().split('T')[0];
+                            }
+
+                            // Tipo parsing
+                            if (!tipoVal) {
+                                tipoVal = valorVal < 0 ? 'Saída' : 'Entrada';
+                            } else if (tipoVal.toLowerCase().includes('sa') || tipoVal.toLowerCase().includes('desp')) {
+                                tipoVal = 'Saída';
+                            } else if (tipoVal.toLowerCase().includes('ent') || tipoVal.toLowerCase().includes('rec')) {
+                                tipoVal = 'Entrada';
+                            }
+
+                            valorVal = Math.abs(valorVal);
+
+                            if (valorVal > 0) {
+                                newTransactions.push({
+                                    id: (Date.now() + i).toString(),
+                                    data: dataVal,
+                                    tipo: tipoVal,
+                                    descricao: descVal || 'Lançamento Importado',
+                                    categoria: catVal || 'Outros',
+                                    valor: valorVal,
+                                    formaPagamento: formaVal || 'Outros'
+                                });
+                                importedCount++;
+                            }
+                        }
+
+                        if (importedCount > 0) {
+                            transactions = [...newTransactions, ...transactions];
+                            saveTransactions();
+                            showToast(`${importedCount} lançamento(s) importado(s) com sucesso!`);
+                        } else {
+                            showToast('Nenhum lançamento válido encontrado no CSV.', 'fa-circle-exclamation text-amber-400');
+                        }
+
+                    } catch (err) {
+                        showToast('Erro ao processar arquivo CSV.', 'fa-circle-xmark text-rose-400');
+                    } finally {
+                        csvFileInput.value = '';
+                    }
+                };
+
+                reader.readAsText(file, 'UTF-8');
+            });
+
+            // Filter listeners
+            searchInput.addEventListener('input', updateUI);
+            filterTipo.addEventListener('change', updateUI);
+
+            btnScanReceipt.addEventListener('click', () => {
+                receiptFileInput.click();
+            });
+
+            receiptFileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // Show loading modal
+                showAILoading(true);
+
+                try {
+                    const base64Data = await fileToBase64(file);
+                    const mimeType = file.type || 'image/jpeg';
+                    const extractedData = await processReceiptWithGemini(base64Data, mimeType);
+
+                    if (extractedData) {
+                        // Preencha o formulário
+                        tipoInput.value = 'Saída'; // Recibos são despesas por padrão
+                        if (extractedData.data) dataInput.value = extractedData.data;
+                        if (extractedData.descricao) descricaoInput.value = extractedData.descricao;
+                        if (extractedData.valor) valorInput.value = extractedData.valor;
+                        if (extractedData.categoria) categoriaInput.value = extractedData.categoria;
+                        if (extractedData.formaPagamento) formaPagamentoInput.value = extractedData.formaPagamento;
+
+                        // Rolar suavemente para o formulário
+                        form.scrollIntoView({ behavior: 'smooth' });
+                        showToast('Recibo lido com sucesso! Confira e confirme os dados.');
+                    }
+                } catch (err) {
+                    console.error('Erro na leitura do recibo:', err);
+                    showToast('Não foi possível ler o recibo. Tente novamente ou insira manualmente.', 'fa-circle-xmark text-rose-400');
+                } finally {
+                    showAILoading(false);
+                    receiptFileInput.value = '';
+                }
+            });
+
+            // Convert File object to Base64 String
+            const fileToBase64 = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const base64Str = reader.result.split(',')[1];
+                        resolve(base64Str);
+                    };
+                    reader.onerror = error => reject(error);
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            // Toggle AI Loading Overlay
+            const showAILoading = (show) => {
+                if (show) {
+                    aiLoadingOverlay.classList.remove('hidden');
+                    setTimeout(() => aiLoadingOverlay.classList.remove('opacity-0'), 10);
+                } else {
+                    aiLoadingOverlay.classList.add('opacity-0');
+                    setTimeout(() => aiLoadingOverlay.classList.add('hidden'), 200);
+                }
+            };
+
+            // Call Gemini API with Exponential Backoff retry
+            const processReceiptWithGemini = async (base64ImageData, mimeType) => {
+                const apiKey = ""; // Runtime automatically inserts API key in Canvas environment
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const promptText = `Analise a imagem deste recibo, nota fiscal ou comprovante de pagamento e extraia os dados para inclusão em controle financeiro.`;
+
+                const payload = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [
+                                { text: promptText },
+                                {
+                                    inlineData: {
+                                        mimeType: mimeType,
+                                        data: base64ImageData
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                data: { type: "STRING", description: "Data da compra no formato AAAA-MM-DD" },
+                                descricao: { type: "STRING", description: "Nome do estabelecimento ou resumo do serviço/produto" },
+                                valor: { type: "NUMBER", description: "Valor total pago no comprovante" },
+                                categoria: { 
+                                    type: "STRING", 
+                                    enum: ["Alimentação", "Transporte", "Moradia", "Lazer", "Saúde", "Educação", "Receita Serviços", "Vendas", "Investimentos", "Outros"],
+                                    description: "Categoria mais adequada entre as opções permitidas"
+                                },
+                                formaPagamento: { 
+                                    type: "STRING", 
+                                    enum: ["Pix", "Débito", "Crédito", "Dinheiro", "Boleto", "Transferência"],
+                                    description: "Forma de pagamento utilizada" 
+                                }
+                            },
+                            required: ["descricao", "valor", "categoria", "formaPagamento"]
+                        }
+                    }
+                };
+
+                // Exponential backoff logic
+                let attempts = 0;
+                const maxAttempts = 3;
+                let delay = 1000;
+
+                while (attempts < maxAttempts) {
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        const rawJsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                        if (rawJsonText) {
+                            return JSON.parse(rawJsonText);
+                        } else {
+                            throw new Error('Resposta sem dados estruturados.');
+                        }
+                    } catch (err) {
+                        attempts++;
+                        if (attempts >= maxAttempts) throw err;
+                        await new Promise(res => setTimeout(res, delay));
+                        delay *= 2;
+                    }
+                }
+                return null;
+            };
+
+            // Initial render
+            updateUI();
+        });
+    </script>
+</body>
+</html>
