@@ -49,10 +49,18 @@
             </div>
             
             <div class="flex items-center space-x-2">
-                <input type="file" id="receiptFileInput" accept="image/*" capture="environment" class="hidden">
-                <button id="btnScanReceipt" class="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                <!-- Câmera Direct Capture -->
+                <input type="file" id="receiptCameraInput" accept="image/*" capture="environment" class="hidden">
+                <button id="btnScanCamera" class="bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm" title="Tirar foto com a câmera">
                     <i class="fa-solid fa-camera text-xs"></i>
-                    <span class="hidden sm:inline">Escanear</span> Recibo
+                    <span class="hidden sm:inline">Tirar</span> Foto
+                </button>
+
+                <!-- Galeria / Imagem Existente -->
+                <input type="file" id="receiptGalleryInput" accept="image/*" class="hidden">
+                <button id="btnScanGallery" class="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm" title="Escolher imagem existente do dispositivo ou galeria">
+                    <i class="fa-solid fa-image text-xs"></i>
+                    <span class="hidden sm:inline">Anexar</span> Imagem
                 </button>
 
                 <input type="file" id="csvFileInput" accept=".csv" class="hidden">
@@ -339,8 +347,10 @@
             const csvFileInput = document.getElementById('csvFileInput');
             const btnClearAll = document.getElementById('btnClearAll');
 
-            const btnScanReceipt = document.getElementById('btnScanReceipt');
-            const receiptFileInput = document.getElementById('receiptFileInput');
+            const btnScanCamera = document.getElementById('btnScanCamera');
+            const receiptCameraInput = document.getElementById('receiptCameraInput');
+            const btnScanGallery = document.getElementById('btnScanGallery');
+            const receiptGalleryInput = document.getElementById('receiptGalleryInput');
             const aiLoadingOverlay = document.getElementById('aiLoadingOverlay');
 
             // Modal Elements
@@ -762,15 +772,10 @@
             searchInput.addEventListener('input', updateUI);
             filterTipo.addEventListener('change', updateUI);
 
-            btnScanReceipt.addEventListener('click', () => {
-                receiptFileInput.click();
-            });
-
-            receiptFileInput.addEventListener('change', async (e) => {
-                const file = e.target.files[0];
+            // Process receipt image (from camera or gallery)
+            const processReceiptFile = async (file) => {
                 if (!file) return;
 
-                // Show loading modal
                 showAILoading(true);
 
                 try {
@@ -779,15 +784,13 @@
                     const extractedData = await processReceiptWithGemini(base64Data, mimeType);
 
                     if (extractedData) {
-                        // Preencha o formulário
-                        tipoInput.value = 'Saída'; // Recibos são despesas por padrão
+                        tipoInput.value = 'Saída';
                         if (extractedData.data) dataInput.value = extractedData.data;
                         if (extractedData.descricao) descricaoInput.value = extractedData.descricao;
                         if (extractedData.valor) valorInput.value = extractedData.valor;
                         if (extractedData.categoria) categoriaInput.value = extractedData.categoria;
                         if (extractedData.formaPagamento) formaPagamentoInput.value = extractedData.formaPagamento;
 
-                        // Rolar suavemente para o formulário
                         form.scrollIntoView({ behavior: 'smooth' });
                         showToast('Recibo lido com sucesso! Confira e confirme os dados.');
                     }
@@ -796,9 +799,16 @@
                     showToast('Não foi possível ler o recibo. Tente novamente ou insira manualmente.', 'fa-circle-xmark text-rose-400');
                 } finally {
                     showAILoading(false);
-                    receiptFileInput.value = '';
+                    receiptCameraInput.value = '';
+                    receiptGalleryInput.value = '';
                 }
-            });
+            };
+
+            btnScanCamera.addEventListener('click', () => receiptCameraInput.click());
+            btnScanGallery.addEventListener('click', () => receiptGalleryInput.click());
+
+            receiptCameraInput.addEventListener('change', (e) => processReceiptFile(e.target.files[0]));
+            receiptGalleryInput.addEventListener('change', (e) => processReceiptFile(e.target.files[0]));
 
             // Convert File object to Base64 String
             const fileToBase64 = (file) => {
