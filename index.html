@@ -63,7 +63,7 @@
                     <span class="hidden sm:inline">Anexar</span> Imagem
                 </button>
 
-                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                <input type="file" id="csvFileInput" accept=".csv, .txt, text/csv, text/plain, application/vnd.ms-excel" class="hidden">
                 <button id="btnImportCSV" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
                     <i class="fa-solid fa-file-import text-xs"></i>
                     <span class="hidden sm:inline">Importar</span> CSV
@@ -661,6 +661,7 @@
 
             // Import from CSV
             btnImportCSV.addEventListener('click', () => {
+                csvFileInput.value = ''; // Reset input to allow selecting the same file again on mobile
                 csvFileInput.click();
             });
 
@@ -672,15 +673,19 @@
                 reader.onload = (evt) => {
                     try {
                         const content = evt.target.result;
-                        const lines = content.split(/\r\n|\n/);
+                        // Normalize line endings for iOS/Android/Windows compatibility
+                        const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
                         if (lines.length < 2) {
-                            showToast('O arquivo CSV parece estar vazio.', 'fa-circle-exclamation text-amber-400');
+                            showToast('O arquivo CSV parece estar vazio ou sem linhas válidas.', 'fa-circle-exclamation text-amber-400');
                             return;
                         }
 
-                        // Auto detect delimiter
+                        // Auto detect delimiter (; or , or tab)
                         const firstLine = lines[0];
-                        const delimiter = firstLine.includes(';') ? ';' : (firstLine.includes('\t') ? '\t' : ',');
+                        let delimiter = ';';
+                        if (firstLine.includes(';')) delimiter = ';';
+                        else if (firstLine.includes(',')) delimiter = ',';
+                        else if (firstLine.includes('\t')) delimiter = '\t';
 
                         // Parse headers
                         const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
@@ -692,6 +697,7 @@
                             const line = lines[i].trim();
                             if (!line) continue;
 
+                            // Handle quoted values in CSV
                             const columns = line.split(delimiter).map(col => col.trim().replace(/^"|"$/g, ''));
                             if (columns.length < 2) continue;
 
@@ -701,36 +707,45 @@
                                 const val = columns[index] || '';
                                 if (h.includes('data') || h.includes('date')) dataVal = val;
                                 else if (h.includes('tipo') || h.includes('type')) tipoVal = val;
-                                else if (h.includes('desc') || h.includes('titulo')) descVal = val;
+                                else if (h.includes('desc') || h.includes('titulo') || h.includes('item') || h.includes('hist')) descVal = val;
                                 else if (h.includes('cat')) catVal = val;
-                                else if (h.includes('valor') || h.includes('amount') || h.includes('price')) {
-                                    let cleanVal = val.replace(/R\$\s?/, '').replace(/\./g, '').replace(',', '.');
+                                else if (h.includes('valor') || h.includes('amount') || h.includes('price') || h.includes('quant')) {
+                                    // Robust Brazilian/International currency parsing
+                                    let cleanVal = val.replace(/R\$\s?/, '').trim();
+                                    if (cleanVal.includes(',') && cleanVal.includes('.')) {
+                                        cleanVal = cleanVal.replace(/\./g, '').replace(',', '.');
+                                    } else if (cleanVal.includes(',')) {
+                                        cleanVal = cleanVal.replace(',', '.');
+                                    }
                                     valorVal = parseFloat(cleanVal) || 0;
                                 }
-                                else if (h.includes('forma') || h.includes('pagamento') || h.includes('method')) formaVal = val;
+                                else if (h.includes('forma') || h.includes('pagamento') || h.includes('method') || h.includes('meio')) formaVal = val;
                             });
 
-                            // Fallbacks
-                            if (!descVal && columns[2]) descVal = columns[2];
-                            if (!descVal && columns[0]) descVal = `Item ${i}`;
+                            // Fallback column positions if headers didn't match keywords
+                            if (!descVal) descVal = columns[2] || columns[1] || columns[0] || `Lançamento ${i}`;
 
-                            // Date parsing (DD/MM/YYYY to YYYY-MM-DD)
+                            // Date parsing (DD/MM/YYYY or YYYY-MM-DD or DD-MM-YYYY)
                             if (dataVal.includes('/')) {
                                 const parts = dataVal.split('/');
                                 if (parts.length === 3) {
-                                    dataVal = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                    if (parts[2].length === 4) {
+                                        dataVal = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                                    } else if (parts[0].length === 4) {
+                                        dataVal = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                                    }
                                 }
                             }
                             if (!dataVal || isNaN(new Date(dataVal).getTime())) {
                                 dataVal = new Date().toISOString().split('T')[0];
                             }
 
-                            // Tipo parsing
+                            // Tipo detection
                             if (!tipoVal) {
                                 tipoVal = valorVal < 0 ? 'Saída' : 'Entrada';
-                            } else if (tipoVal.toLowerCase().includes('sa') || tipoVal.toLowerCase().includes('desp')) {
+                            } else if (tipoVal.toLowerCase().includes('sa') || tipoVal.toLowerCase().includes('desp') || tipoVal.toLowerCase().includes('deb')) {
                                 tipoVal = 'Saída';
-                            } else if (tipoVal.toLowerCase().includes('ent') || tipoVal.toLowerCase().includes('rec')) {
+                            } else if (tipoVal.toLowerCase().includes('ent') || tipoVal.toLowerCase().includes('rec') || tipoVal.toLowerCase().includes('cred')) {
                                 tipoVal = 'Entrada';
                             }
 
@@ -744,7 +759,7 @@
                                     descricao: descVal || 'Lançamento Importado',
                                     categoria: catVal || 'Outros',
                                     valor: valorVal,
-                                    formaPagamento: formaVal || 'Outros'
+                                    formaPagamento: formaVal || 'Pix'
                                 });
                                 importedCount++;
                             }
@@ -755,11 +770,12 @@
                             saveTransactions();
                             showToast(`${importedCount} lançamento(s) importado(s) com sucesso!`);
                         } else {
-                            showToast('Nenhum lançamento válido encontrado no CSV.', 'fa-circle-exclamation text-amber-400');
+                            showToast('Nenhum lançamento válido encontrado. Verifique se o CSV possui cabeçalhos com Data, Descrição e Valor.', 'fa-circle-exclamation text-amber-400');
                         }
 
                     } catch (err) {
-                        showToast('Erro ao processar arquivo CSV.', 'fa-circle-xmark text-rose-400');
+                        console.error('Erro ao importar CSV:', err);
+                        showToast('Erro ao processar arquivo CSV no seu dispositivo.', 'fa-circle-xmark text-rose-400');
                     } finally {
                         csvFileInput.value = '';
                     }
